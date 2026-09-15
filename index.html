@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Mapalagama Trade Fair — 3D Site Model</title>
+<style>
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html, body { margin:0; padding:0; overflow:hidden; width:100%; height:100%; background:#bcd4e0; font-family: 'Segoe UI', Arial, sans-serif; }
+  #canvas-wrap { position:fixed; inset:0; touch-action:none; }
+  canvas { display:block; touch-action:none; }
+
+  button { font-family:inherit; cursor:pointer; }
+
+  /* ---- Top-left info panel ---- */
+  #title-panel {
+    position:fixed; top:12px; left:12px; z-index:15;
+    width:min(300px, 78vw);
+    background:rgba(250,246,236,0.94); border:1px solid #cdbfa0;
+    border-radius:10px; box-shadow:0 4px 14px rgba(0,0,0,0.18);
+    overflow:hidden;
+  }
+  #title-panel .panel-head {
+    display:flex; align-items:center; justify-content:space-between; gap:8px;
+    padding:11px 14px; cursor:pointer; user-select:none;
+  }
+  #title-panel h1 {
+    margin:0; font-family: Georgia, 'Times New Roman', serif; font-size:clamp(15px,4vw,19px);
+    color:#3a2f22; font-weight:700; letter-spacing:0.2px;
+  }
+  #title-panel .panel-body { padding:0 14px 13px; }
+  #title-panel p { margin:0; font-size:12.5px; color:#5c5240; line-height:1.55; }
+  .chev { font-size:13px; color:#8a7a57; flex:0 0 auto; transition:transform .2s ease; }
+  #title-panel.collapsed .panel-body,
+  #legend-panel.collapsed .panel-body { display:none; }
+  #title-panel.collapsed .chev,
+  #legend-panel.collapsed .chev { transform:rotate(-90deg); }
+
+  /* ---- Top-right legend panel ---- */
+  #legend-panel {
+    position:fixed; top:12px; right:12px; z-index:15;
+    width:min(200px, 46vw);
+    background:rgba(250,246,236,0.94); border:1px solid #cdbfa0;
+    border-radius:10px; box-shadow:0 4px 14px rgba(0,0,0,0.18);
+    overflow:hidden;
+  }
+  #legend-panel .panel-head {
+    display:flex; align-items:center; justify-content:space-between; gap:8px;
+    padding:11px 14px; cursor:pointer; user-select:none;
+  }
+  #legend-panel h2 { margin:0; font-size:13px; color:#3a2f22; font-family: Georgia, serif; }
+  #legend-panel .panel-body { padding:0 14px 12px; max-height:58vh; overflow-y:auto; }
+  #legend-panel ul { list-style:none; margin:0; padding:0; }
+  #legend-panel li { display:flex; gap:8px; align-items:baseline; font-size:12px; color:#4a4232; padding:5px 0; border-bottom:1px solid #e5dcc6; }
+  #legend-panel li:last-child { border-bottom:none; }
+  #legend-panel .num { font-weight:700; color:#7a5230; min-width:20px; }
+
+  /* ---- Desktop hover tooltip (mouse only) ---- */
+  #tooltip {
+    position:fixed; pointer-events:none; display:none;
+    background:rgba(30,26,20,0.92); color:#f5efe0; padding:8px 11px; border-radius:5px;
+    font-size:12.5px; line-height:1.5; z-index:30; max-width:220px;
+    box-shadow:0 4px 10px rgba(0,0,0,0.3);
+  }
+  #tooltip .name { font-weight:700; font-size:13.5px; display:block; margin-bottom:2px; }
+
+  /* ---- Mobile / touch tap-to-inspect bottom sheet ---- */
+  #mobile-sheet {
+    position:fixed; left:0; right:0; bottom:0; z-index:40;
+    background:rgba(250,246,236,0.98); border-top:1px solid #cdbfa0;
+    border-radius:14px 14px 0 0; box-shadow:0 -6px 18px rgba(0,0,0,0.22);
+    padding:10px 18px calc(16px + env(safe-area-inset-bottom));
+    transform:translateY(105%); transition:transform .25s ease;
+  }
+  #mobile-sheet.open { transform:translateY(0); }
+  #mobile-sheet .handle { width:36px; height:4px; border-radius:2px; background:#d8cdac; margin:2px auto 10px; }
+  #mobile-sheet .sheet-name { font-family:Georgia, serif; font-size:16px; font-weight:700; color:#3a2f22; margin:0 0 4px; }
+  #mobile-sheet .sheet-meta { font-size:13px; color:#5c5240; line-height:1.5; }
+
+  /* ---- Small round helper buttons ---- */
+  .icon-btn {
+    width:30px; height:30px; border-radius:50%; border:none;
+    background:#7a5230; color:#f5efe0; font-size:15px; line-height:1;
+    display:flex; align-items:center; justify-content:center;
+  }
+
+  @media (max-width: 640px) {
+    #title-panel { width:60vw; }
+    #legend-panel { width:38vw; }
+    #title-panel p { font-size:11.5px; }
+    #legend-panel .num { min-width:16px; }
+    #legend-panel li { font-size:11px; }
+  }
+</style>
+</head>
+<body>
+<div id="canvas-wrap"></div>
+
+<div id="title-panel">
+  <div class="panel-head" id="title-toggle">
+    <h1>Evergreen Enterprises Mega Sale</h1>
+    <span class="chev">▾</span>
+  </div>
+  <div class="panel-body">
+    <p>3D site model, built from the stall layout drawing.<br>
+    <strong>Drag / swipe</strong> to orbit · <strong>scroll or pinch</strong> to zoom · <strong>tap a stall</strong> for details.</p>
+  </div>
+</div>
+
+<div id="legend-panel">
+  <div class="panel-head" id="legend-toggle">
+    <h2>Stalls</h2>
+    <span class="chev">▾</span>
+  </div>
+  <div class="panel-body">
+    <ul id="legend-list"></ul>
+  </div>
+</div>
+
+<div id="tooltip"></div>
+
+<div id="mobile-sheet">
+  <div class="handle"></div>
+  <p class="sheet-name" id="sheet-name"></p>
+  <div class="sheet-meta" id="sheet-meta"></div>
+</div>
+
+<script>
+  // Panel collapse/expand (also auto-collapses on small screens at load)
+  function wirePanel(panelId, toggleId) {
+    var panel = document.getElementById(panelId);
+    var toggle = document.getElementById(toggleId);
+    toggle.addEventListener('click', function () { panel.classList.toggle('collapsed'); });
+    if (window.innerWidth <= 640) panel.classList.add('collapsed');
+  }
+  wirePanel('title-panel', 'title-toggle');
+  wirePanel('legend-panel', 'legend-toggle');
+</script>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function(){
+  "use strict";
+
+  // ---------- Data (normalized from the hand-drawn layout) ----------
+  // Angles: 0deg = due east (toward the road/right side), sweeping counter-clockwise
+  // through the top of the horseshoe to ~200deg (west/left side, near the road).
+  const R1 = 34;   // inner radius (courtyard edge)
+  const R2 = 54;   // outer radius (back wall)
+  const WALL_H = 14;
+  const SPAN = 20;      // degrees per stall
+  const GAP = 0.9;      // degree gap between stalls for visual separation
+
+  const palette = ['#EDE6D6', '#E3D9C6', '#DCCFB8', '#E8DFCE'];
+  const roofColor = '#33414f';
+  const counterColor = '#7c5a3a';
+
+  const stallDefs = [
+    { name: 'BL Customer', num: 1 },
+    { name: 'Evergreen Enterprises',      num: 2 },
+    { name: 'Machinery',            num: 3 },
+    { name: 'Tea Place',                  num: 4 },
+    { name: 'Universal',                  num: 5 },
+    { name: 'Olic',                        num: 6 },
+    { name: 'Bhagya',                     num: 7 },
+    { name: 'Vivo',                       num: 8 },
+    { name: 'Telesonic',                  num: 9 },
+    { name: 'Daytron',                    num: 10 },
+    { name: 'Singer',                     num: 11 },
+  ].map((s, i) => ({
+    ...s,
+    start: -20 + i * SPAN,
+    end: -20 + (i + 1) * SPAN,
+  }));
+
+  // ---------- Scene / camera / renderer ----------
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0xbcd4e0);
+  scene.fog = new THREE.Fog(0xbcd4e0, 220, 520);
+
+  const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 2000);
+
+  const renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.shadowMap.enabled = true;
+  document.getElementById('canvas-wrap').appendChild(renderer.domElement);
+
+  // ---------- Lighting ----------
+  const hemi = new THREE.HemisphereLight(0xbcd4e0, 0x46543a, 0.65);
+  scene.add(hemi);
+
+  const sun = new THREE.DirectionalLight(0xfff3d8, 0.95);
+  sun.position.set(160, 220, 90);
+  sun.castShadow = true;
+  sun.shadow.mapSize.set(2048, 2048);
+  sun.shadow.camera.left = -220;
+  sun.shadow.camera.right = 220;
+  sun.shadow.camera.top = 220;
+  sun.shadow.camera.bottom = -220;
+  sun.shadow.camera.far = 600;
+  scene.add(sun);
+
+  const ambient = new THREE.AmbientLight(0xffffff, 0.28);
+  scene.add(ambient);
+
+  // ---------- Helpers ----------
+  function polarToWorld(r, deg, y) {
+    const t = deg * Math.PI / 180;
+    return new THREE.Vector3(r * Math.cos(t), y || 0, -r * Math.sin(t));
+  }
+
+  function buildWedgeShape(r1, r2, startDeg, endDeg, segments) {
+    segments = segments || 10;
+    const shape = new THREE.Shape();
+    const step = (endDeg - startDeg) / segments;
+    for (let i = 0; i <= segments; i++) {
+      const d = startDeg + step * i;
+      const t = d * Math.PI / 180;
+      const x = r2 * Math.cos(t), y = r2 * Math.sin(t);
+      if (i === 0) shape.moveTo(x, y); else shape.lineTo(x, y);
+    }
+    for (let i = segments; i >= 0; i--) {
+      const d = startDeg + step * i;
+      const t = d * Math.PI / 180;
+      shape.lineTo(r1 * Math.cos(t), r1 * Math.sin(t));
+    }
+    shape.closePath();
+    return shape;
+  }
+
+  function makeTextSprite(text, opts) {
+    opts = opts || {};
+    const fontsize = opts.fontsize || 46;
+    const color = opts.color || '#241d12';
+    const bg = opts.bg || null;
+    const weight = opts.weight || '600';
+    const pad = 18;
+
+    const measureCanvas = document.createElement('canvas');
+    const mctx = measureCanvas.getContext('2d');
+    mctx.font = weight + ' ' + fontsize + 'px "Segoe UI", Arial, sans-serif';
+    const lines = text.split('\n');
+    let maxW = 0;
+    lines.forEach(l => { maxW = Math.max(maxW, mctx.measureText(l).width); });
+
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.ceil(maxW) + pad * 2;
+    canvas.height = Math.ceil(lines.length * fontsize * 1.25) + pad;
+    const ctx = canvas.getContext('2d');
+    ctx.font = weight + ' ' + fontsize + 'px "Segoe UI", Arial, sans-serif';
+
+    if (bg) {
+      ctx.fillStyle = bg;
+      roundRect(ctx, 0, 0, canvas.width, canvas.height, 14);
+      ctx.fill();
+    }
+    ctx.fillStyle = color;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    const lineH = fontsize * 1.25;
+    const startY = canvas.height / 2 - (lineH * (lines.length - 1)) / 2;
+    lines.forEach((l, i) => ctx.fillText(l, canvas.width / 2, startY + i * lineH));
+
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.needsUpdate = true;
+    const mat = new THREE.SpriteMaterial({ map: tex, depthTest: false, depthWrite: false, transparent: true });
+    const sprite = new THREE.Sprite(mat);
+    const aspect = canvas.width / canvas.height;
+    const h = opts.scale || 8;
+    sprite.scale.set(h * aspect, h, 1);
+    sprite.renderOrder = 999;
+    return sprite;
+  }
+
+  function roundRect(ctx, x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+
+  // ---------- Ground layers ----------
+  const baseGround = new THREE.Mesh(
+    new THREE.PlaneGeometry(700, 700),
+    new THREE.MeshStandardMaterial({ color: 0xd8e4cd, roughness: 1 })
+  );
+  baseGround.rotation.x = -Math.PI / 2;
+  baseGround.position.y = -0.2;
+  baseGround.receiveShadow = true;
+  scene.add(baseGround);
+
+  const plaza = new THREE.Mesh(
+    new THREE.CircleGeometry(R1, 56),
+    new THREE.MeshStandardMaterial({ color: 0x8a9b73, roughness: 1 })
+  );
+  plaza.rotation.x = -Math.PI / 2;
+  plaza.position.y = 0;
+  plaza.receiveShadow = true;
+  scene.add(plaza);
+
+  // Road (south of the plaza)
+  const ROAD_Z = 100;
+  const road = new THREE.Mesh(
+    new THREE.PlaneGeometry(340, 42),
+    new THREE.MeshStandardMaterial({ color: 0x47484c, roughness: 0.95 })
+  );
+  road.rotation.x = -Math.PI / 2;
+  road.position.set(0, -0.08, ROAD_Z);
+  road.receiveShadow = true;
+  scene.add(road);
+
+  for (let x = -160; x <= 160; x += 16) {
+    const dash = new THREE.Mesh(
+      new THREE.BoxGeometry(7, 0.15, 1),
+      new THREE.MeshStandardMaterial({ color: 0xe9e4d6 })
+    );
+    dash.position.set(x, 0.0, ROAD_Z);
+    scene.add(dash);
+  }
+
+  const mainRoadLabel = makeTextSprite('Main Road', { fontsize: 40, color: '#f2ede0', bg: 'rgba(30,26,20,0.55)', scale: 10, weight: '700' });
+  mainRoadLabel.position.set(0, 11, ROAD_Z + 2);
+  scene.add(mainRoadLabel);
+
+  const westSign = makeTextSprite('\u2190  Mapalagama', { fontsize: 38, color: '#f2ede0', bg: 'rgba(30,26,20,0.55)', scale: 9, weight: '700' });
+  westSign.position.set(-62, 9, ROAD_Z - 4);
+  scene.add(westSign);
+
+  const eastSign = makeTextSprite('Elpitiya / Pitigala  \u2192', { fontsize: 38, color: '#f2ede0', bg: 'rgba(30,26,20,0.55)', scale: 9, weight: '700' });
+  eastSign.position.set(62, 9, ROAD_Z - 4);
+  scene.add(eastSign);
+
+  // ---------- Stalls ----------
+  const stallMeshes = [];
+  const legendList = document.getElementById('legend-list');
+
+  stallDefs.forEach((s, i) => {
+    const start = s.start + GAP, end = s.end - GAP;
+    const wallColor = palette[i % palette.length];
+
+    const wallGeo = new THREE.ExtrudeGeometry(buildWedgeShape(R1, R2, start, end), { depth: WALL_H, bevelEnabled: false });
+    const wallMat = new THREE.MeshStandardMaterial({ color: wallColor, roughness: 0.85, emissive: 0x000000 });
+    const roofMat = new THREE.MeshStandardMaterial({ color: roofColor, roughness: 0.6 });
+    const wallMesh = new THREE.Mesh(wallGeo, [wallMat, roofMat]);
+    wallMesh.rotation.x = -Math.PI / 2;
+    wallMesh.castShadow = true;
+    wallMesh.receiveShadow = true;
+    wallMesh.userData.info = { name: s.name, num: s.num, depth: Math.round(R2 - R1) };
+    wallMesh.userData.wallMat = wallMat;
+    scene.add(wallMesh);
+    stallMeshes.push(wallMesh);
+
+    const counterGeo = new THREE.ExtrudeGeometry(buildWedgeShape(R1 - 2, R1 + 1, start, end), { depth: 3, bevelEnabled: false });
+    const counterMesh = new THREE.Mesh(counterGeo, new THREE.MeshStandardMaterial({ color: counterColor, roughness: 0.8 }));
+    counterMesh.rotation.x = -Math.PI / 2;
+    counterMesh.castShadow = true;
+    counterMesh.receiveShadow = true;
+    scene.add(counterMesh);
+
+    const mid = (start + end) / 2;
+    const midR = (R1 + R2) / 2;
+
+    const nameSprite = makeTextSprite(s.name, { fontsize: 40, color: '#241d12', bg: 'rgba(250,246,236,0.88)', scale: 7 });
+    const namePos = polarToWorld(midR, mid, WALL_H + 6);
+    nameSprite.position.copy(namePos);
+    scene.add(nameSprite);
+
+    const numSprite = makeTextSprite('No.' + String(s.num).padStart(2, '0'), { fontsize: 38, color: '#f5efe0', bg: 'rgba(122,82,48,0.92)', scale: 5.2, weight: '700' });
+    const numPos = polarToWorld(R2 + 9, mid, WALL_H * 0.5 + 1);
+    numSprite.position.copy(numPos);
+    scene.add(numSprite);
+
+    const li = document.createElement('li');
+    li.innerHTML = '<span class="num">' + String(s.num).padStart(2, '0') + '</span><span>' + s.name + '</span>';
+    legendList.appendChild(li);
+  });
+
+  // ---------- Entrance gate ----------
+  const gateMat = new THREE.MeshStandardMaterial({ color: 0xcfc2a3, roughness: 0.7 });
+  const gateZ = R1 + 16;
+  [-14, 14].forEach(x => {
+    const pillar = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 1.6, 16, 16), gateMat);
+    pillar.position.set(x, 8, gateZ);
+    pillar.castShadow = true;
+    scene.add(pillar);
+  });
+  const beam = new THREE.Mesh(new THREE.BoxGeometry(32, 2.2, 3), gateMat);
+  beam.position.set(0, 16, gateZ);
+  beam.castShadow = true;
+  scene.add(beam);
+  const entranceSign = makeTextSprite('ENTRANCE', { fontsize: 42, color: '#241d12', bg: 'rgba(250,246,236,0.92)', scale: 6.5, weight: '700' });
+  entranceSign.position.set(0, 19.5, gateZ);
+  scene.add(entranceSign);
+
+  // Center landmark (flagpole, for scale/orientation)
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 20, 10), new THREE.MeshStandardMaterial({ color: 0x555555 }));
+  pole.position.set(0, 10, 0);
+  pole.castShadow = true;
+  scene.add(pole);
+  const flag = new THREE.Mesh(new THREE.PlaneGeometry(6, 4), new THREE.MeshStandardMaterial({ color: 0xb5432f, side: THREE.DoubleSide }));
+  flag.position.set(3, 18, 0);
+  scene.add(flag);
+
+  // ---------- Flanking buildings (east side, near Stall 01) ----------
+  function buildBox(w, h, d, x, z, wallCol, roofCol, label) {
+    const group = new THREE.Group();
+    const body = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new THREE.MeshStandardMaterial({ color: wallCol, roughness: 0.8 }));
+    body.position.set(0, h / 2, 0);
+    body.castShadow = true; body.receiveShadow = true;
+    group.add(body);
+    const roof = new THREE.Mesh(new THREE.BoxGeometry(w + 2, 1.4, d + 2), new THREE.MeshStandardMaterial({ color: roofCol, roughness: 0.6 }));
+    roof.position.set(0, h + 0.7, 0);
+    roof.castShadow = true;
+    group.add(roof);
+    if (label) {
+      const sprite = makeTextSprite(label, { fontsize: 36, color: '#241d12', bg: 'rgba(250,246,236,0.9)', scale: 6 });
+      sprite.position.set(0, h + 5, 0);
+      group.add(sprite);
+    }
+    group.position.set(x, 0, z);
+    scene.add(group);
+    return group;
+  }
+
+  function buildBus(x, z, label, rotY) {
+    const group = new THREE.Group();
+    const bodyColor = 0xf2f2ec, stripeColor = 0x2f6fae, glassColor = 0x1b2733, wheelColor = 0x161616;
+    const length = 24, width = 8, height = 7.5;
+
+    const lower = new THREE.Mesh(new THREE.BoxGeometry(length, height * 0.6, width), new THREE.MeshStandardMaterial({ color: bodyColor, roughness: 0.55 }));
+    lower.position.y = height * 0.6 / 2 + 1.3;
+    lower.castShadow = true; lower.receiveShadow = true;
+    group.add(lower);
+
+    const upper = new THREE.Mesh(new THREE.BoxGeometry(length * 0.94, height * 0.42, width * 0.94), new THREE.MeshStandardMaterial({ color: bodyColor, roughness: 0.5 }));
+    upper.position.y = lower.position.y + height * 0.6 / 2 + height * 0.42 / 2 - 0.35;
+    upper.castShadow = true;
+    group.add(upper);
+
+    const windowBand = new THREE.Mesh(new THREE.BoxGeometry(length * 0.86, height * 0.3, width * 0.98), new THREE.MeshStandardMaterial({ color: glassColor, roughness: 0.3, metalness: 0.35 }));
+    windowBand.position.y = upper.position.y - 0.15;
+    group.add(windowBand);
+
+    const stripe = new THREE.Mesh(new THREE.BoxGeometry(length * 0.98, 0.9, width * 1.0), new THREE.MeshStandardMaterial({ color: stripeColor, roughness: 0.5 }));
+    stripe.position.y = lower.position.y - height * 0.6 / 2 + 1.1;
+    group.add(stripe);
+
+    const windshield = new THREE.Mesh(new THREE.BoxGeometry(1.2, height * 0.5, width * 0.88), new THREE.MeshStandardMaterial({ color: glassColor, roughness: 0.3, metalness: 0.3 }));
+    windshield.position.set(length / 2 - 0.4, lower.position.y + 0.7, 0);
+    group.add(windshield);
+
+    const wheelGeo = new THREE.CylinderGeometry(1.3, 1.3, 1.3, 16);
+    const wheelMat = new THREE.MeshStandardMaterial({ color: wheelColor, roughness: 0.9 });
+    [-length / 2 + 3.6, length / 2 - 3.6].forEach(wx => {
+      [-width / 2 * 0.94, width / 2 * 0.94].forEach(wz => {
+        const wheel = new THREE.Mesh(wheelGeo, wheelMat);
+        wheel.rotation.x = Math.PI / 2;
+        wheel.position.set(wx, 1.3, wz);
+        wheel.castShadow = true;
+        group.add(wheel);
+      });
+    });
+
+    if (label) {
+      const sprite = makeTextSprite(label, { fontsize: 36, color: '#241d12', bg: 'rgba(250,246,236,0.9)', scale: 6 });
+      sprite.position.set(0, height + 5, 0);
+      group.add(sprite);
+    }
+
+    group.position.set(x, 0, z);
+    if (rotY) group.rotation.y = rotY;
+    scene.add(group);
+    return group;
+  }
+
+  buildBox(58, 20, 24, 96, 34, 0xefe9dc, roofColor, 'Evergreen Enterprises\nBuilding');
+  buildBus(96, 66, 'Vision Care Bus', 0);
+
+  // ---------- Camera controls (custom orbit, touch + mouse, no external deps) ----------
+  const target = new THREE.Vector3(0, 8, 40);
+  let radius = Math.min(340, Math.max(160, window.innerWidth < 640 ? 320 : 250));
+  let theta = 0.55, phi = 0.88;
+  const MIN_R = 70, MAX_R = 420;
+
+  function clamp(v, a, b) { return Math.min(b, Math.max(a, v)); }
+
+  function updateCamera() {
+    camera.position.x = target.x + radius * Math.sin(phi) * Math.sin(theta);
+    camera.position.y = target.y + radius * Math.cos(phi);
+    camera.position.z = target.z + radius * Math.sin(phi) * Math.cos(theta);
+    camera.lookAt(target);
+  }
+  updateCamera();
+
+  const dom = renderer.domElement;
+  const pointers = new Map();   // pointerId -> {x,y}
+  let dragging = false, lastX = 0, lastY = 0;
+  let pinchDist = 0, pinchRadius = 0;
+  let downInfo = null;          // {x,y,time} of the most recent single-pointer press
+
+  function pinchDistance() {
+    const pts = Array.from(pointers.values());
+    return Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+  }
+
+  dom.addEventListener('contextmenu', e => e.preventDefault());
+
+  dom.addEventListener('pointerdown', e => {
+    dom.setPointerCapture(e.pointerId);
+    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pointers.size === 1) {
+      dragging = true; lastX = e.clientX; lastY = e.clientY;
+      downInfo = { x: e.clientX, y: e.clientY, time: Date.now(), type: e.pointerType };
+    } else if (pointers.size === 2) {
+      dragging = false;
+      pinchDist = pinchDistance();
+      pinchRadius = radius;
+    }
+  });
+
+  window.addEventListener('pointermove', e => {
+    if (!pointers.has(e.pointerId)) {
+      if (e.pointerType === 'mouse') handleHover(e);
+      return;
+    }
+    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+    if (pointers.size >= 2) {
+      const d = pinchDistance();
+      if (pinchDist > 0) {
+        radius = clamp(pinchRadius * (pinchDist / d), MIN_R, MAX_R);
+        updateCamera();
+      }
+    } else if (dragging) {
+      const dx = e.clientX - lastX, dy = e.clientY - lastY;
+      lastX = e.clientX; lastY = e.clientY;
+      theta -= dx * 0.006;
+      phi = clamp(phi - dy * 0.006, 0.18, 1.48);
+      updateCamera();
+    }
+    if (e.pointerType === 'mouse') handleHover(e);
+  });
+
+  function endPointer(e) {
+    if (pointers.has(e.pointerId) && downInfo && pointers.size === 1) {
+      const dx = e.clientX - downInfo.x, dy = e.clientY - downInfo.y;
+      if (Math.hypot(dx, dy) < 8 && Date.now() - downInfo.time < 500) handleTap(e);
+    }
+    pointers.delete(e.pointerId);
+    if (pointers.size === 0) {
+      dragging = false; downInfo = null;
+    } else if (pointers.size === 1) {
+      const remaining = Array.from(pointers.values())[0];
+      dragging = true; lastX = remaining.x; lastY = remaining.y;
+      pinchDist = 0;
+    }
+  }
+  window.addEventListener('pointerup', endPointer);
+  window.addEventListener('pointercancel', endPointer);
+
+  dom.addEventListener('wheel', e => {
+    e.preventDefault();
+    radius = clamp(radius * (1 + e.deltaY * 0.001), MIN_R, MAX_R);
+    updateCamera();
+  }, { passive: false });
+
+  // ---------- Hover tooltip (mouse) + tap-to-inspect sheet (touch & click) ----------
+  const raycaster = new THREE.Raycaster();
+  const mouse = new THREE.Vector2();
+  const tooltip = document.getElementById('tooltip');
+  const sheet = document.getElementById('mobile-sheet');
+  const sheetName = document.getElementById('sheet-name');
+  const sheetMeta = document.getElementById('sheet-meta');
+  let hovered = null;
+
+  function setHighlight(mesh) {
+    if (hovered === mesh) return;
+    if (hovered) hovered.userData.wallMat.emissive.setHex(0x000000);
+    hovered = mesh;
+    if (hovered) {
+      hovered.userData.wallMat.emissive.setHex(0x3a4a5a);
+      hovered.userData.wallMat.emissiveIntensity = 0.35;
+    }
+  }
+
+  function pickStall(clientX, clientY) {
+    mouse.x = (clientX / window.innerWidth) * 2 - 1;
+    mouse.y = -(clientY / window.innerHeight) * 2 + 1;
+    raycaster.setFromCamera(mouse, camera);
+    const hits = raycaster.intersectObjects(stallMeshes);
+    return hits.length ? hits[0].object : null;
+  }
+
+  function handleHover(e) {
+    const obj = pickStall(e.clientX, e.clientY);
+    if (obj) {
+      setHighlight(obj);
+      const info = obj.userData.info;
+      tooltip.style.display = 'block';
+      tooltip.style.left = Math.min(window.innerWidth - 230, e.clientX + 14) + 'px';
+      tooltip.style.top = (e.clientY + 14) + 'px';
+      tooltip.innerHTML = '<span class="name">' + info.name + '</span>Stall No. ' + String(info.num).padStart(2, '0') + '<br>~' + info.depth + ' ft deep bay';
+    } else {
+      setHighlight(null);
+      tooltip.style.display = 'none';
+    }
+  }
+
+  function handleTap(e) {
+    const obj = pickStall(e.clientX, e.clientY);
+    if (obj) {
+      setHighlight(obj);
+      const info = obj.userData.info;
+      sheetName.textContent = info.name;
+      sheetMeta.textContent = 'Stall No. ' + String(info.num).padStart(2, '0') + ' · ~' + info.depth + ' ft deep bay';
+      sheet.classList.add('open');
+      tooltip.style.display = 'none';
+    } else {
+      setHighlight(null);
+      sheet.classList.remove('open');
+    }
+  }
+
+  sheet.addEventListener('pointerdown', e => e.stopPropagation());
+
+  // ---------- Resize ----------
+  window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
+
+  // ---------- Render loop ----------
+  function animate() {
+    requestAnimationFrame(animate);
+    renderer.render(scene, camera);
+  }
+  animate();
+})();
+</script>
+</body>
+</html>
